@@ -97,8 +97,8 @@ struct CronJobsView: View {
             }
         } else if let error = appState.cronJobsError, appState.cronJobs.isEmpty {
             HermesSurfacePanel {
-                ContentUnavailableView(
-                    "Unable to load cron jobs",
+                HermesContentUnavailableView(
+                    L10n.string("Unable to load cron jobs"),
                     systemImage: "exclamationmark.triangle",
                     description: Text(error)
                 )
@@ -106,8 +106,8 @@ struct CronJobsView: View {
             }
         } else if appState.cronJobs.isEmpty {
             HermesSurfacePanel {
-                ContentUnavailableView(
-                    "No cron jobs found",
+                HermesContentUnavailableView(
+                    L10n.string("No cron jobs found"),
                     systemImage: "calendar.badge.exclamationmark",
                     description: Text(noCronJobsDescription)
                 )
@@ -128,7 +128,7 @@ struct CronJobsView: View {
                     }
 
                     if filteredJobs.isEmpty {
-                        ContentUnavailableView(
+                        HermesContentUnavailableView(
                             L10n.string("No matching cron jobs"),
                             systemImage: "magnifyingglass",
                             description: Text(L10n.string("Try searching by title, schedule, skill, model, delivery target or prompt text."))
@@ -491,7 +491,7 @@ private struct CronJobDetailView: View {
                     }
                 } else {
                     HermesSurfacePanel {
-                        ContentUnavailableView(
+                        HermesContentUnavailableView(
                             L10n.string("Select a cron job"),
                             systemImage: "calendar.badge.clock",
                             description: Text(L10n.string("Choose a Hermes cron job from the active host to inspect it, or create a new one."))

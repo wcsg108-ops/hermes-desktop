@@ -110,11 +110,11 @@ struct RootView: View {
             .onAppear {
                 appState.connectionStore.appAppearance.applyToApplication()
             }
-            .onChange(of: appState.connectionStore.appAppearance) { _, newValue in
+            .hermesOnChange(of: appState.connectionStore.appAppearance) { newValue in
                 newValue.applyToApplication()
             }
-            .onChange(of: appState.connectionStore.visibleSidebarSections) { _, _ in
-                ensureSelectedSectionAvailable()
+            .hermesOnChange(of: appState.connectionStore.visibleSidebarSections) { visibleSections in
+                ensureSelectedSectionAvailable(visibleSections: visibleSections)
             }
     }
 
@@ -297,8 +297,11 @@ struct RootView: View {
         }
     }
 
-    private func ensureSelectedSectionAvailable() {
-        guard !availableSections.contains(appState.selectedSection) else { return }
+    private func ensureSelectedSectionAvailable(visibleSections: [AppSection]) {
+        let sections = appState.activeConnection == nil
+            ? [.connections]
+            : [.connections] + visibleSections
+        guard !sections.contains(appState.selectedSection) else { return }
         appState.requestSectionSelection(.connections)
     }
 

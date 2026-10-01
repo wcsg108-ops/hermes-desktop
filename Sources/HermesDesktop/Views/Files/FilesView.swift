@@ -296,7 +296,7 @@ struct FilesView: View {
             } else {
                 ScrollView {
                     HermesSurfacePanel {
-                        ContentUnavailableView(
+                        HermesContentUnavailableView(
                             L10n.string("No File Selected"),
                             systemImage: "doc.text.magnifyingglass",
                             description: Text(L10n.string("Choose a file from the library."))
@@ -547,7 +547,7 @@ private struct WorkspaceFileEditorPane: View {
                 if isLoading {
                     HermesLoadingOverlay()
                 } else if !hasLoaded {
-                    ContentUnavailableView(
+                    HermesContentUnavailableView(
                         L10n.string("Loading file"),
                         systemImage: "doc.text",
                         description: Text(L10n.string("Reading from the active Hermes machine."))
@@ -693,7 +693,7 @@ private struct WorkspaceFileBrowserSheet: View {
                         .strokeBorder(HermesTheme.subtleStroke, lineWidth: 1)
                 }
             } else {
-                ContentUnavailableView(
+                HermesContentUnavailableView(
                     L10n.string("No Directory Loaded"),
                     systemImage: "folder",
                     description: Text(L10n.string("Enter a path to browse files on the active Hermes machine."))

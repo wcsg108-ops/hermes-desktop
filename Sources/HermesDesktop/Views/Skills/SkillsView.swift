@@ -61,7 +61,7 @@ struct SkillsView: View {
             }
         } else if let error = appState.skillsError, appState.skills.isEmpty {
             HermesSurfacePanel {
-                ContentUnavailableView(
+                HermesContentUnavailableView(
                     L10n.string("Unable to load skills"),
                     systemImage: "exclamationmark.triangle",
                     description: Text(error)
@@ -70,7 +70,7 @@ struct SkillsView: View {
             }
         } else if appState.skills.isEmpty {
             HermesSurfacePanel {
-                ContentUnavailableView(
+                HermesContentUnavailableView(
                     L10n.string("No skills found"),
                     systemImage: "book.closed",
                     description: Text(noSkillsDescription)
@@ -83,7 +83,7 @@ struct SkillsView: View {
                 subtitle: "Select a skill to inspect its metadata, related assets and full SKILL.md content."
             ) {
                 if filteredSkills.isEmpty {
-                    ContentUnavailableView(
+                    HermesContentUnavailableView(
                         L10n.string("No matching skills"),
                         systemImage: "magnifyingglass",
                         description: Text(L10n.string("Try searching by skill name or category."))

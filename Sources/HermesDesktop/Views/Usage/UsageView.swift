@@ -38,8 +38,8 @@ struct UsageView: View {
             }
         } else if let error = appState.usageError, appState.usageSummary == nil {
             HermesSurfacePanel {
-                ContentUnavailableView(
-                    "Unable to load usage",
+                HermesContentUnavailableView(
+                    L10n.string("Unable to load usage"),
                     systemImage: "exclamationmark.triangle",
                     description: Text(error)
                 )
@@ -52,8 +52,8 @@ struct UsageView: View {
                     availableUsageView(summary: usageSummary)
                 case .unavailable:
                     HermesSurfacePanel {
-                        ContentUnavailableView(
-                            "Usage unavailable",
+                        HermesContentUnavailableView(
+                            L10n.string("Usage unavailable"),
                             systemImage: "internaldrive.slash",
                             description: Text(
                                 usageSummary.message ??
@@ -200,8 +200,8 @@ struct UsageView: View {
             subtitle: "Host-wide all-categories view. It adds input, output, cache, and reasoning tokens across readable profiles; active-profile cards stay input/output focused."
         ) {
             if breakdown.chartProfiles.count < 2 {
-                ContentUnavailableView(
-                    "Not enough profile data yet",
+                HermesContentUnavailableView(
+                    L10n.string("Not enough profile data yet"),
                     systemImage: "chart.pie",
                     description: Text(L10n.string("At least two profiles need readable usage data before the cross-profile breakdown becomes meaningful."))
                 )
@@ -510,8 +510,8 @@ struct UsageView: View {
             subtitle: "The last 100 stored sessions, shown as input/output tokens over time."
         ) {
             if summary.recentSessions.isEmpty {
-                ContentUnavailableView(
-                    "No recent sessions available",
+                HermesContentUnavailableView(
+                    L10n.string("No recent sessions available"),
                     systemImage: "chart.bar.xaxis",
                     description: Text(L10n.string("Recent session usage will appear here once Hermes has stored session data."))
                 )
@@ -680,41 +680,55 @@ private struct UsageProfileDonutChart: View {
     let breakdown: UsageProfileBreakdown
     let colors: [Color]
 
+    @ViewBuilder
     var body: some View {
-        Chart(Array(breakdown.chartProfiles.enumerated()), id: \.element.id) { index, profile in
-            SectorMark(
-                angle: .value(L10n.string("All Categories"), profile.allTokenCategoriesTotal),
-                innerRadius: .ratio(0.62),
-                angularInset: 2
-            )
-            .cornerRadius(6)
-            .foregroundStyle(colors[index % colors.count])
-            .accessibilityLabel(profile.profileName)
-            .accessibilityValue(L10n.string(
-                "%@ all-category tokens",
-                UsageNumberFormatter.string(for: profile.allTokenCategoriesTotal)
-            ))
-        }
-        .chartLegend(.hidden)
-        .overlay {
-            VStack(spacing: 6) {
-                Text(L10n.string("Host-wide"))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-
-                Text(UsageNumberFormatter.shortString(for: breakdown.hostWideAllTokenCategoriesTotal))
-                    .font(.system(size: 24, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-
-                Text(L10n.string("all categories"))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+        if #available(macOS 14.0, *) {
+            Chart(Array(breakdown.chartProfiles.enumerated()), id: \.element.id) { index, profile in
+                SectorMark(
+                    angle: .value(L10n.string("All Categories"), profile.allTokenCategoriesTotal),
+                    innerRadius: .ratio(0.62),
+                    angularInset: 2
+                )
+                .cornerRadius(6)
+                .foregroundStyle(colors[index % colors.count])
+                .accessibilityLabel(profile.profileName)
+                .accessibilityValue(L10n.string(
+                    "%@ all-category tokens",
+                    UsageNumberFormatter.string(for: profile.allTokenCategoriesTotal)
+                ))
             }
-            .padding(12)
+            .chartLegend(.hidden)
+            .overlay {
+                summary
+            }
+        } else {
+            Circle()
+                .stroke(Color.secondary.opacity(0.18), lineWidth: 28)
+                .padding(36)
+                .overlay {
+                    summary
+                }
         }
+    }
+
+    private var summary: some View {
+        VStack(spacing: 6) {
+            Text(L10n.string("Host-wide"))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Text(UsageNumberFormatter.shortString(for: breakdown.hostWideAllTokenCategoriesTotal))
+                .font(.system(size: 24, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+
+            Text(L10n.string("all categories"))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(12)
     }
 }
 

@@ -137,15 +137,15 @@ struct ConnectionsView: View {
             Text(L10n.string("Hermes Desktop will no longer track or display this profile. The profile will remain available on the host and can still be accessed via terminal."))
         }
         .onAppear {
-            presentPendingNewConnectionEditorIfNeeded()
+            presentPendingNewConnectionEditorIfNeeded(appState.pendingNewConnectionEditorRequestID)
         }
         .task(id: appState.activeConnectionID) {
             guard appState.activeConnection != nil else { return }
             guard appState.overview == nil else { return }
             await appState.refreshOverview(manual: false)
         }
-        .onChange(of: appState.pendingNewConnectionEditorRequestID) { _, _ in
-            presentPendingNewConnectionEditorIfNeeded()
+        .hermesOnChange(of: appState.pendingNewConnectionEditorRequestID) { requestID in
+            presentPendingNewConnectionEditorIfNeeded(requestID)
         }
     }
 
@@ -723,8 +723,8 @@ struct ConnectionsView: View {
         editorPresentation = ConnectionEditorPresentation(connection: connection, isEditing: isEditing)
     }
 
-    private func presentPendingNewConnectionEditorIfNeeded() {
-        guard let requestID = appState.pendingNewConnectionEditorRequestID else { return }
+    private func presentPendingNewConnectionEditorIfNeeded(_ pendingRequestID: UUID?) {
+        guard let requestID = pendingRequestID else { return }
         presentEditor(for: ConnectionProfile(), isEditing: false)
         appState.consumeNewConnectionEditorRequest(requestID)
     }

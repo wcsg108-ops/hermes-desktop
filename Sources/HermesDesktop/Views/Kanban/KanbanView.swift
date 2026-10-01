@@ -38,27 +38,27 @@ struct KanbanView: View {
             }
         }
         .onAppear { recomputeKanbanCaches() }
-        .onChange(of: appState.kanbanBoard) { _, _ in
-            recomputeKanbanCaches()
+        .hermesOnChange(of: appState.kanbanBoard) { board in
+            recomputeKanbanCaches(boardOverride: .some(board))
         }
-        .onChange(of: appState.includeArchivedKanbanTasks) { _, includeArchived in
-            recomputeKanbanCaches()
+        .hermesOnChange(of: appState.includeArchivedKanbanTasks) { includeArchived in
+            recomputeKanbanCaches(includeArchivedOverride: includeArchived)
             Task { await appState.refreshKanbanBoard(includeArchived: includeArchived) }
         }
-        .onChange(of: statusFilter) { _, filter in
-            recomputeKanbanCaches()
+        .hermesOnChange(of: statusFilter) { filter in
+            recomputeKanbanCaches(statusFilterOverride: filter)
             if filter == .archived, !appState.includeArchivedKanbanTasks {
                 appState.includeArchivedKanbanTasks = true
             }
         }
-        .onChange(of: assigneeFilter) { _, _ in
-            recomputeKanbanCaches()
+        .hermesOnChange(of: assigneeFilter) { assignee in
+            recomputeKanbanCaches(assigneeFilterOverride: assignee)
         }
-        .onChange(of: tenantFilter) { _, _ in
-            recomputeKanbanCaches()
+        .hermesOnChange(of: tenantFilter) { tenant in
+            recomputeKanbanCaches(tenantFilterOverride: tenant)
         }
-        .onChange(of: searchText) { _, _ in
-            recomputeKanbanCaches()
+        .hermesOnChange(of: searchText) { searchText in
+            recomputeKanbanCaches(searchTextOverride: searchText)
         }
         .alert(L10n.string("Archive this Kanban board?"), isPresented: $showArchiveBoardConfirmation, presenting: boardPendingArchive) { board in
             Button(L10n.string("Archive"), role: .destructive) {
@@ -341,7 +341,7 @@ struct KanbanView: View {
             }
         } else if let error = appState.kanbanError, appState.kanbanBoard == nil {
             HermesSurfacePanel {
-                ContentUnavailableView(
+                HermesContentUnavailableView(
                     L10n.string("Unable to load Kanban"),
                     systemImage: "exclamationmark.triangle",
                     description: Text(error)
@@ -351,7 +351,7 @@ struct KanbanView: View {
         } else if let board = appState.kanbanBoard, !board.isInitialized {
             HermesSurfacePanel {
                 VStack(alignment: .leading, spacing: 18) {
-                    ContentUnavailableView(
+                    HermesContentUnavailableView(
                         L10n.string("No Kanban board yet"),
                         systemImage: "rectangle.3.group",
                         description: Text(noKanbanDatabaseDescription(board))
@@ -622,20 +622,34 @@ struct KanbanView: View {
         cachedTenantOptions
     }
 
-    private func recomputeKanbanCaches() {
+    private func recomputeKanbanCaches(
+        boardOverride: KanbanBoard?? = nil,
+        includeArchivedOverride: Bool? = nil,
+        statusFilterOverride: KanbanStatusFilter? = nil,
+        assigneeFilterOverride: KanbanFilterOption? = nil,
+        tenantFilterOverride: KanbanFilterOption? = nil,
+        searchTextOverride: String? = nil
+    ) {
+        let board = boardOverride ?? appState.kanbanBoard
+        let includeArchived = includeArchivedOverride ?? appState.includeArchivedKanbanTasks
+        let statusFilter = statusFilterOverride ?? self.statusFilter
+        let assigneeFilter = assigneeFilterOverride ?? self.assigneeFilter
+        let tenantFilter = tenantFilterOverride ?? self.tenantFilter
+        let searchText = searchTextOverride ?? self.searchText
+
         cachedFilteredTasks = Self.computeFilteredTasks(
-            board: appState.kanbanBoard,
-            includeArchived: appState.includeArchivedKanbanTasks,
+            board: board,
+            includeArchived: includeArchived,
             status: statusFilter.status,
             assignee: assigneeFilter,
             tenant: tenantFilter,
             searchText: searchText
         )
-        cachedAssigneeOptions = Self.computeAssigneeOptions(board: appState.kanbanBoard)
-        cachedTenantOptions = Self.computeTenantOptions(board: appState.kanbanBoard)
+        cachedAssigneeOptions = Self.computeAssigneeOptions(board: board)
+        cachedTenantOptions = Self.computeTenantOptions(board: board)
         cachedDisplayStatuses = Self.computeDisplayStatuses(
             status: statusFilter.status,
-            includeArchived: appState.includeArchivedKanbanTasks
+            includeArchived: includeArchived
         )
     }
 
@@ -873,7 +887,7 @@ private struct KanbanEmptyTaskState: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            ContentUnavailableView(
+            HermesContentUnavailableView(
                 title,
                 systemImage: systemImage,
                 description: Text(description)
@@ -1349,6 +1363,16 @@ private struct KanbanTaskEditorView: View {
     }
 }
 
+private struct KanbanDraftChange<Trigger: Equatable>: Equatable {
+    let trigger: Trigger
+    let task: KanbanTask?
+    let detail: KanbanTaskDetail?
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.trigger == rhs.trigger
+    }
+}
+
 private struct KanbanTaskDetailView: View {
     let connectionKind: ConnectionKind
     let task: KanbanTask?
@@ -1436,7 +1460,7 @@ private struct KanbanTaskDetailView: View {
                 } else {
                     HermesSurfacePanel {
                         VStack(alignment: .leading, spacing: 18) {
-                            ContentUnavailableView(
+                            HermesContentUnavailableView(
                                 L10n.string("Select a Kanban task"),
                                 systemImage: "rectangle.3.group",
                                 description: Text(L10n.string("Choose a task from the selected board, or create a new one."))
@@ -1456,18 +1480,18 @@ private struct KanbanTaskDetailView: View {
             .padding(.horizontal, 24)
             .padding(.vertical, 22)
         }
-        .onChange(of: task?.id) { _, _ in
-            resetDraft()
+        .hermesOnChange(of: KanbanDraftChange(trigger: task?.id, task: task, detail: detail)) { change in
+            resetDraft(task: change.task, detail: change.detail)
             expandedAction = nil
         }
-        .onChange(of: detail?.parentIDs) { _, _ in
-            resetDraft()
+        .hermesOnChange(of: KanbanDraftChange(trigger: detail?.parentIDs, task: task, detail: detail)) { change in
+            resetDraft(task: change.task, detail: change.detail)
         }
-        .onChange(of: detail?.childIDs) { _, _ in
-            resetDraft()
+        .hermesOnChange(of: KanbanDraftChange(trigger: detail?.childIDs, task: task, detail: detail)) { change in
+            resetDraft(task: change.task, detail: change.detail)
         }
         .onAppear {
-            resetDraft()
+            resetDraft(task: task, detail: detail)
         }
         .alert(L10n.string("Archive this task?"), isPresented: $showArchiveConfirmation, presenting: task) { task in
             Button(L10n.string("Archive"), role: .destructive) {
@@ -1500,7 +1524,7 @@ private struct KanbanTaskDetailView: View {
         )
     }
 
-    private func resetDraft() {
+    private func resetDraft(task: KanbanTask?, detail: KanbanTaskDetail?) {
         draft = KanbanActionDraft(
             comment: "",
             result: task?.trimmedResult ?? "",
@@ -2227,7 +2251,7 @@ private struct KanbanTaskDetailView: View {
     }
 
     private func toggleAction(_ action: KanbanActionKind) {
-        withAnimation(.snappy(duration: 0.16)) {
+        withAnimation(.hermesSnappy(duration: 0.16)) {
             expandedAction = expandedAction == action ? nil : action
         }
     }

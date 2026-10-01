@@ -70,8 +70,8 @@ struct SkillDetailView: View {
                     }
                 } else if let errorMessage, summary != nil {
                     HermesSurfacePanel {
-                        ContentUnavailableView(
-                            "Unable to load skill detail",
+                        HermesContentUnavailableView(
+                            L10n.string("Unable to load skill detail"),
                             systemImage: "exclamationmark.triangle",
                             description: Text(errorMessage)
                         )
@@ -80,7 +80,7 @@ struct SkillDetailView: View {
                 } else {
                     HermesSurfacePanel {
                         VStack(alignment: .leading, spacing: 18) {
-                            ContentUnavailableView(
+                            HermesContentUnavailableView(
                                 L10n.string("Select a skill"),
                                 systemImage: "book.closed",
                                 description: Text(L10n.string("Choose a Hermes skill from the active host to inspect its metadata and full SKILL.md."))
@@ -279,8 +279,9 @@ struct SkillEditorView: View {
             .padding(.horizontal, 24)
             .padding(.vertical, 22)
         }
-        .onChange(of: draft.name) { _, _ in
+        .hermesOnChange(of: draft.name) { name in
             guard mode == .create else { return }
+            draft.name = name
             draft.refreshSuggestedSlug()
         }
     }

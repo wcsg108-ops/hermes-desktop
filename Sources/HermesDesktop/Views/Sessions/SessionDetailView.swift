@@ -64,6 +64,27 @@ private struct SessionScrollRequest: Equatable {
     }
 }
 
+private struct SessionIdentityChange: Equatable {
+    let id: String?
+    let savedScrollOffset: CGFloat?
+    let latestMessageScrollID: String?
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.id == rhs.id
+    }
+}
+
+private struct SessionMessagesChange: Equatable {
+    let key: String
+    let hasSession: Bool
+    let isActive: Bool
+    let latestMessageScrollID: String?
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.key == rhs.key
+    }
+}
+
 struct SessionDetailView: View {
     let connection: ConnectionProfile?
     let session: SessionSummary?
@@ -103,6 +124,23 @@ struct SessionDetailView: View {
 
     private var latestMessageScrollKey: String {
         "\(messages.count):\(messages.last?.id ?? "none")"
+    }
+
+    private var sessionIdentityChange: SessionIdentityChange {
+        SessionIdentityChange(
+            id: session?.id,
+            savedScrollOffset: savedScrollOffset,
+            latestMessageScrollID: messages.last.map(sessionMessageScrollID)
+        )
+    }
+
+    private var sessionMessagesChange: SessionMessagesChange {
+        SessionMessagesChange(
+            key: latestMessageScrollKey,
+            hasSession: session != nil,
+            isActive: isActive,
+            latestMessageScrollID: messages.last.map(sessionMessageScrollID)
+        )
     }
 
     var body: some View {
@@ -261,17 +299,29 @@ struct SessionDetailView: View {
                     .help(L10n.string("Scroll to the latest message"))
                 }
             }
-            .onChange(of: session?.id) { _, _ in
+            .hermesOnChange(of: sessionIdentityChange) { change in
                 expandedMetadataMessageIDs.removeAll()
                 shouldAutoScrollNextMessageLoad = true
-                restoreSavedScrollOffsetOrScrollToLatest(proxy)
+                restoreSavedScrollOffsetOrScrollToLatest(
+                    proxy,
+                    savedScrollOffset: change.savedScrollOffset,
+                    latestTarget: scrollTarget(messageID: change.latestMessageScrollID)
+                )
             }
-            .onChange(of: latestMessageScrollKey) { _, _ in
-                guard session != nil, !messages.isEmpty else { return }
-                handleMessageScrollChange(proxy)
+            .hermesOnChange(of: sessionMessagesChange) { change in
+                guard change.hasSession, let messageID = change.latestMessageScrollID else { return }
+                handleMessageScrollChange(
+                    proxy,
+                    isActive: change.isActive,
+                    latestTarget: scrollTarget(messageID: messageID)
+                )
             }
             .task(id: session?.id) {
-                restoreSavedScrollOffsetOrScrollToLatest(proxy)
+                restoreSavedScrollOffsetOrScrollToLatest(
+                    proxy,
+                    savedScrollOffset: savedScrollOffset,
+                    latestTarget: latestScrollTarget
+                )
             }
         }
     }
@@ -294,7 +344,7 @@ struct SessionDetailView: View {
             transcriptContent(for: session)
         } else {
             HermesSurfacePanel {
-                ContentUnavailableView(
+                HermesContentUnavailableView(
                     L10n.string("Start or select a session"),
                     systemImage: "bubble.left.and.bubble.right",
                     description: Text(L10n.string("Use New Chat to start the real Hermes TUI, or choose an existing session to inspect its stored transcript."))
@@ -308,7 +358,7 @@ struct SessionDetailView: View {
     private func transcriptContent(for session: SessionSummary) -> some View {
         if messages.isEmpty {
             HermesSurfacePanel {
-                ContentUnavailableView(
+                HermesContentUnavailableView(
                     L10n.string("No transcript entries"),
                     systemImage: "text.bubble",
                     description: Text(L10n.string("This session has no readable message rows yet."))
@@ -374,7 +424,7 @@ struct SessionDetailView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .onChange(of: terminal.terminalSession.exitCode) { _, _ in
+            .hermesOnChange(of: terminal.terminalSession.exitCode) { _ in
                 Task { await onTerminalExitRefresh() }
             }
         } else {
@@ -386,7 +436,7 @@ struct SessionDetailView: View {
     private var sessionChatPlaceholder: some View {
         HermesSurfacePanel {
             VStack(alignment: .center, spacing: 14) {
-                ContentUnavailableView(
+                HermesContentUnavailableView(
                     chatPlaceholderTitle,
                     systemImage: "terminal",
                     description: Text(chatPlaceholderDescription)
@@ -498,18 +548,26 @@ struct SessionDetailView: View {
         scrollMetrics.distanceToBottom <= 96
     }
 
-    private func handleMessageScrollChange(_ proxy: ScrollViewProxy) {
+    private func handleMessageScrollChange(
+        _ proxy: ScrollViewProxy,
+        isActive: Bool,
+        latestTarget: (id: String, anchor: UnitPoint)
+    ) {
         if shouldAutoScrollNextMessageLoad {
             shouldAutoScrollNextMessageLoad = false
-            requestScrollToLatest(proxy, reason: .messagesLoaded)
+            requestScrollToLatest(proxy, reason: .messagesLoaded, target: latestTarget)
             return
         }
 
         guard isActive, isNearLatest else { return }
-        requestScrollToLatest(proxy, reason: .messagesLoaded)
+        requestScrollToLatest(proxy, reason: .messagesLoaded, target: latestTarget)
     }
 
-    private func restoreSavedScrollOffsetOrScrollToLatest(_ proxy: ScrollViewProxy) {
+    private func restoreSavedScrollOffsetOrScrollToLatest(
+        _ proxy: ScrollViewProxy,
+        savedScrollOffset: CGFloat?,
+        latestTarget: (id: String, anchor: UnitPoint)
+    ) {
         if savedScrollOffset != nil {
             let request = SessionScrollRequest(reason: .sessionChanged)
             scrollRequest = request
@@ -523,12 +581,17 @@ struct SessionDetailView: View {
             return
         }
 
-        requestScrollToLatest(proxy, reason: .sessionChanged)
+        requestScrollToLatest(proxy, reason: .sessionChanged, target: latestTarget)
     }
 
-    private func requestScrollToLatest(_ proxy: ScrollViewProxy, reason: SessionScrollReason) {
+    private func requestScrollToLatest(
+        _ proxy: ScrollViewProxy,
+        reason: SessionScrollReason,
+        target: (id: String, anchor: UnitPoint)? = nil
+    ) {
         let request = SessionScrollRequest(reason: reason)
         scrollRequest = request
+        let target = target ?? latestScrollTarget
 
         scheduleScroll(
             proxy,
@@ -578,6 +641,14 @@ struct SessionDetailView: View {
     private var latestScrollTarget: (id: String, anchor: UnitPoint) {
         if let lastMessage = messages.last {
             return (sessionMessageScrollID(lastMessage), .top)
+        }
+
+        return (sessionDetailBottomID, .bottom)
+    }
+
+    private func scrollTarget(messageID: String?) -> (id: String, anchor: UnitPoint) {
+        if let messageID {
+            return (messageID, .top)
         }
 
         return (sessionDetailBottomID, .bottom)

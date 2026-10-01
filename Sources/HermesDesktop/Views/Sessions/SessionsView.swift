@@ -167,7 +167,7 @@ struct SessionsView: View {
             }
         } else if let error = appState.sessionsError, !hasVisibleSessions {
             HermesSurfacePanel {
-                ContentUnavailableView(
+                HermesContentUnavailableView(
                     L10n.string("Unable to load sessions"),
                     systemImage: "exclamationmark.triangle",
                     description: Text(error)
@@ -176,7 +176,7 @@ struct SessionsView: View {
             }
         } else if !hasVisibleSessions && !appState.sessionSearchQuery.isEmpty {
             HermesSurfacePanel {
-                ContentUnavailableView(
+                HermesContentUnavailableView(
                     L10n.string("No matching sessions"),
                     systemImage: "magnifyingglass",
                     description: Text(L10n.string("Try searching by session name, ID, preview text, or message content."))
@@ -185,7 +185,7 @@ struct SessionsView: View {
             }
         } else if !hasVisibleSessions {
             HermesSurfacePanel {
-                ContentUnavailableView(
+                HermesContentUnavailableView(
                     L10n.string("No sessions found"),
                     systemImage: "tray",
                     description: Text(noSessionsDescription)

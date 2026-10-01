@@ -1,0 +1,93 @@
+name: Ventura Intel Experiment
+
+on:
+  push:
+    branches:
+      - ventura-intel-experiment
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ventura-intel-experiment-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ventura-intel:
+    runs-on: macos-15-intel
+    env:
+      HERMES_MAC_ARCHS: x86_64
+      MACOSX_DEPLOYMENT_TARGET: "13.0"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Show build environment
+        run: |
+          uname -m
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      - name: Run tests
+        run: ./scripts/run-tests.sh
+
+      - name: Build Intel app bundle
+        run: ./scripts/build-macos-app.sh
+
+      - name: Validate app bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APP_PATH="$GITHUB_WORKSPACE/dist/HermesDesktop.app"
+          INFO_PLIST_PATH="$APP_PATH/Contents/Info.plist"
+          EXECUTABLE_PATH="$APP_PATH/Contents/MacOS/HermesDesktop"
+
+          [[ -d "$APP_PATH" ]] || { echo "error: missing $APP_PATH" >&2; exit 1; }
+          [[ -f "$INFO_PLIST_PATH" ]] || { echo "error: missing $INFO_PLIST_PATH" >&2; exit 1; }
+          [[ -x "$EXECUTABLE_PATH" ]] || { echo "error: missing executable $EXECUTABLE_PATH" >&2; exit 1; }
+
+          MINIMUM_SYSTEM_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$INFO_PLIST_PATH")"
+          [[ "$MINIMUM_SYSTEM_VERSION" == "13.0" ]] || {
+            echo "error: expected LSMinimumSystemVersion 13.0, found $MINIMUM_SYSTEM_VERSION" >&2
+            exit 1
+          }
+
+          ARCHITECTURES="$(lipo -archs "$EXECUTABLE_PATH")"
+          [[ "$ARCHITECTURES" == "x86_64" ]] || {
+            echo "error: expected x86_64 executable, found $ARCHITECTURES" >&2
+            exit 1
+          }
+
+          BUILD_VERSION_INFO="$(xcrun vtool -show-build "$EXECUTABLE_PATH")"
+          printf '%s\n' "$BUILD_VERSION_INFO"
+          grep -q 'LC_BUILD_VERSION' <<<"$BUILD_VERSION_INFO"
+          grep -Eq 'minos[[:space:]]+13\.0([[:space:]]|$)' <<<"$BUILD_VERSION_INFO"
+
+      - name: Create ZIP artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APP_PATH="$GITHUB_WORKSPACE/dist/HermesDesktop.app"
+          ZIP_PATH="$GITHUB_WORKSPACE/dist/HermesDesktop-ventura-x86_64.app.zip"
+
+          ditto -c -k --norsrc --keepParent "$APP_PATH" "$ZIP_PATH"
+          [[ -s "$ZIP_PATH" ]] || { echo "error: ZIP was not created" >&2; exit 1; }
+          ditto -x -k "$ZIP_PATH" "$RUNNER_TEMP/hermes-ventura-artifact-check"
+          [[ -d "$RUNNER_TEMP/hermes-ventura-artifact-check/HermesDesktop.app" ]] || {
+            echo "error: ZIP does not contain HermesDesktop.app" >&2
+            exit 1
+          }
+
+      - name: Upload Intel app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HermesDesktop-ventura-x86_64-${{ github.sha }}
+          path: dist/HermesDesktop-ventura-x86_64.app.zip
+          if-no-files-found: error
+          retention-days: 7

@@ -71,7 +71,7 @@ struct TerminalWorkspaceView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             } else {
-                ContentUnavailableView(
+                HermesContentUnavailableView(
                     L10n.string("No terminal tab"),
                     systemImage: "terminal",
                     description: Text(L10n.string("Create a tab to start a real local or SSH shell for the active connection."))
@@ -85,7 +85,7 @@ struct TerminalWorkspaceView: View {
                 ensureTerminalSession()
             }
         }
-        .onChange(of: context.isTerminalSectionActive) { _, isActive in
+        .hermesOnChange(of: context.isTerminalSectionActive) { isActive in
             if isActive {
                 ensureTerminalSession()
             }
@@ -426,7 +426,7 @@ struct TerminalAppearanceEditor: View {
         .onAppear {
             resetCustomDraft(from: appearance)
         }
-        .onChange(of: themePreference) { _, newValue in
+        .hermesOnChange(of: themePreference) { newValue in
             resetCustomDraft(from: newValue.resolvedAppearance)
         }
     }

@@ -45,7 +45,7 @@ struct WorkflowsView: View {
             await appState.loadSkills(reset: false)
             appState.loadWorkflows(reset: true)
         }
-        .onChange(of: appState.skills) { _, newValue in
+        .hermesOnChange(of: appState.skills) { newValue in
             guard editorMode != nil else { return }
             editorDraft.refreshSelectedSkills(using: newValue)
         }
@@ -79,7 +79,7 @@ struct WorkflowsView: View {
     private var workflowsContent: some View {
         if appState.workflows.isEmpty {
             HermesSurfacePanel {
-                ContentUnavailableView(
+                HermesContentUnavailableView(
                     L10n.string("No workflows saved"),
                     systemImage: "bolt.horizontal.circle",
                     description: Text(L10n.string("Create a reusable prompt preset for this host/profile, with optional preloaded skills."))
@@ -92,7 +92,7 @@ struct WorkflowsView: View {
                 subtitle: "Select a workflow to inspect its prompt, assigned skills and launch readiness."
             ) {
                 if filteredWorkflows.isEmpty {
-                    ContentUnavailableView(
+                    HermesContentUnavailableView(
                         L10n.string("No matching workflows"),
                         systemImage: "magnifyingglass",
                         description: Text(L10n.string("Try searching by workflow name, prompt text, or skill path."))
@@ -456,7 +456,7 @@ private struct WorkflowDetailView: View {
             }
         } else {
             HermesSurfacePanel {
-                ContentUnavailableView(
+                HermesContentUnavailableView(
                     L10n.string("No workflow selected"),
                     systemImage: "bolt.horizontal.circle",
                     description: Text(L10n.string("Choose a workflow from the list or create a new reusable preset for this host/profile."))

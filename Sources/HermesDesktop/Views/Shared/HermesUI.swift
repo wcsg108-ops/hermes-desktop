@@ -440,6 +440,55 @@ struct HermesLoadingState: View {
     }
 }
 
+struct HermesContentUnavailableView: View {
+    let title: String
+    let systemImage: String
+    let description: Text
+
+    init(_ title: String, systemImage: String, description: Text) {
+        self.title = title
+        self.systemImage = systemImage
+        self.description = description
+    }
+
+    @ViewBuilder
+    var body: some View {
+        if #available(macOS 14.0, *) {
+            ContentUnavailableView(
+                title,
+                systemImage: systemImage,
+                description: description
+            )
+        } else {
+            VStack(spacing: 12) {
+                Image(systemName: systemImage)
+                    .font(.largeTitle)
+                    .foregroundStyle(.secondary)
+
+                Text(title)
+                    .font(.title3.weight(.semibold))
+                    .multilineTextAlignment(.center)
+
+                description
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(24)
+        }
+    }
+}
+
+extension Animation {
+    static func hermesSnappy(duration: TimeInterval) -> Animation {
+        if #available(macOS 14.0, *) {
+            return .snappy(duration: duration, extraBounce: 0)
+        }
+
+        return .spring(response: duration, dampingFraction: 0.82)
+    }
+}
+
 struct HermesLoadingOverlay: View {
     var body: some View {
         ProgressView()
@@ -770,7 +819,7 @@ struct HermesExpandableSearchField: View {
         .onAppear {
             isExpanded = !text.isEmpty
         }
-        .onChange(of: focusRequestID) { _, requestID in
+        .hermesOnChange(of: focusRequestID) { requestID in
             guard requestID != nil else { return }
             withAnimation(.spring(response: 0.24, dampingFraction: 0.88)) {
                 isExpanded = true
@@ -779,7 +828,7 @@ struct HermesExpandableSearchField: View {
                 isFocused = true
             }
         }
-        .onChange(of: isFocused) { _, focused in
+        .hermesOnChange(of: isFocused) { focused in
             if !focused && text.isEmpty {
                 isExpanded = false
             }
@@ -909,6 +958,20 @@ struct HermesSplitLayout: Equatable {
 }
 
 extension View {
+    @ViewBuilder
+    func hermesOnChange<Value: Equatable>(
+        of value: Value,
+        perform action: @escaping (Value) -> Void
+    ) -> some View {
+        if #available(macOS 14.0, *) {
+            self.onChange(of: value) { _, newValue in
+                action(newValue)
+            }
+        } else {
+            self.onChange(of: value, perform: action)
+        }
+    }
+
     func hermesSplitDetailColumn(minWidth: CGFloat, idealWidth: CGFloat) -> some View {
         frame(
             minWidth: minWidth,
@@ -1034,7 +1097,7 @@ struct HermesCollapsibleHSplitView<Primary: View, Detail: View>: View {
     let keepsSplitViewWhenCollapsed: Bool
     let primary: Primary
     let detail: Detail
-    private let collapseAnimation = Animation.snappy(duration: 0.16, extraBounce: 0)
+    private let collapseAnimation = Animation.hermesSnappy(duration: 0.16)
     private let resizeUpdateStep: CGFloat = 1
     @State private var activeResizeStartingWidth: CGFloat?
     @State private var activeResizeLiveWidth: CGFloat?
